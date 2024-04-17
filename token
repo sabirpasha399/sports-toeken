@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract SportsToken is ERC20, Ownable, ERC20Burnable, Pausable {
+    event LogMessage(string message);
+
+    struct SportingItem {
+        string itemName;
+        uint256 itemPrice;
+    }
+
+    mapping(string => SportingItem) public sportingItems;
+    mapping(address => string) public redeemed;
+
+    constructor() ERC20("SPORTS", "SPRT") Ownable(msg.sender) {
+        _initializeSportingItems();
+    }
+
+    modifier hasSufficientFunds(uint256 tokens) {
+        require(balanceOf(msg.sender) >= tokens, "INSUFFICIENT FUNDS!!");
+        _;
+    }
+
+    function _initializeSportingItems() internal {
+        _addSportingItem("CricketBall", 120);
+        _addSportingItem("Football", 200);
+        _addSportingItem("Volleyball", 150);
+        _addSportingItem("Throwball", 100);
+    }
+
+    function _addSportingItem(string memory itemName, uint256 itemPrice) internal {
+        sportingItems[itemName] = SportingItem(itemName, itemPrice);
+    }
+
+    function mint(address grantee, uint256 tokens) external onlyOwner {
+        _mint(grantee, tokens);
+    }
+
+    function transferTokens(address recipient, uint256 tokens) external hasSufficientFunds(tokens) {
+        _transfer(msg.sender, recipient, tokens);
+    }
+
+    function redeemSportingItem(string memory itemName) external payable hasSufficientFunds(sportingItems[itemName].itemPrice) {
+        SportingItem storage item = sportingItems[itemName];
+        redeemed[msg.sender] = itemName;
+        _burn(msg.sender, item.itemPrice);
+        emit LogMessage("Redeemed sporting item");
+    }
+
+    // Function to burn tokens
+    function burn(uint256 amount) public override {
+        _burn(_msgSender(), amount);
+    }
+
+    // Different function: Modify sporting item name
+    function modifySportingItemName(string memory currentName, string memory newName) external onlyOwner {
+        require(bytes(sportingItems[currentName].itemName).length > 0, "Sporting item does not exist");
+        sportingItems[newName] = sportingItems[currentName];
+        delete sportingItems[currentName];
+    }
+
+   
+    function emergencyPauseContract() external onlyOwner {
+        _pause();
+    }
+}
